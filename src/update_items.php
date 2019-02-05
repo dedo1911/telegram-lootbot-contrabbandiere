@@ -72,7 +72,7 @@ if ($dec["code"] == 200 and $arr[0]["id"]) {
     }
 }
 
-$items = richiesta_API("http://fenixweb.net:3300/api/v2/" . $GLOBALS['config']["lootbot_api_token"] . "/items");
+$items = richiesta_API("http://fenixweb.net:3300/api/v2/" . $GLOBALS['config']["lootbot_api_token"] . "/crafts/id");
 $dec = json_decode($items, true);
 if (!is_array($dec)) {
     return;
