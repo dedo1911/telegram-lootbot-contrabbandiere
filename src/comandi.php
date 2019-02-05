@@ -1,17 +1,11 @@
 <?php
 
-function digest($string)
-{
-    return md5($string."salt");
+function digest($string) {
+    return md5($string . $GLOBALS['config']['salt']);
 }
 
-function prepare_for_db($query)
-{
-    //return utf8_decode($query); se il db è in utf8 e non funziona qualcosa
-    return $query;
-}
 
-if (strpos($msg, "/ping")===0) {
+if (strpos($msg, "/ping") === 0) {
     $inizio = (int) $datemsg;
     $msg_r = smReturn($chatID, "<i>Pong</i>", $idcmd);
     $id_r = $msg_r['message_id'];
@@ -24,7 +18,7 @@ if (strpos($msg, "/ping")===0) {
 }
 
 //COMANDI
-if ($chatID==$userID) {
+if ($chatID == $userID) {
     if ($msg == "/start") {
         sm($chatID, "In privato posso dirti se qualcuno si prenota ad una tua offerta.\n\nSorgenti: https://github.com/ldeluigi/telegram-lootbot-contrabbandiere");
     } elseif ($msg == "/clear") {
@@ -40,7 +34,7 @@ if ($chatID==$userID) {
         sm($chatID, json_encode(is_between_times('00:28', '22:44')));
     }
     return;
-} else if (!in_array($chatID, $groups) and $config["allow_all_groups"] !== true) {
+} else if (!in_array($chatID, $groups) and $GLOBALS['config']["allow_all_groups"] !== true) {
     sm($chatID, "Questo gruppo [ID:<code>$chatID</code>] non è abilitato.\n\n<i>Grazie e arrivederci</i>");
     leave();
     return;
@@ -69,41 +63,67 @@ if (($inoltrato) and ($inoltrato_id==171514820) and (mb_strpos($msg, 'Benvenut')
         }
         //nome item prezzo
         $test = digest($nome.$item.$prezzo);
-        $q = mysqli_query($link, prepare_for_db("SELECT * FROM contrabbandi WHERE test=\"".$test."\" OR test=\"*".$test."\""));
-        if (mysqli_num_rows($q)===0) {
+        $q = $GLOBALS['db']->prepare("SELECT * FROM contrabbandi WHERE test=? OR test=?");
+        $q->execute(array($test, '*' . $test));
+        if ($q->rowCount() === 0) {
             $t = time();
-            mysqli_query($link, prepare_for_db("INSERT INTO contrabbandi (time, test, nome, item, prezzo, chat_id, creation) VALUES($t, \"".$test."\", \"".$nome."\", \"".$item."\", \"".$prezzo."\", $chatID, $t)"));
+            $q2 = $GLOBALS['db']->prepare("INSERT INTO contrabbandi (time, test, nome, item, prezzo, chat_id, creation) VALUES(?, ?, ?, ?, ?, ?, ?)");
+            $q2->execute(array($t, $test, $nome, $item, $prezzo, $chatID, $t));
             $menu[] = array(
-        array(
-        "text" => "Mi prenoto",
-        "callback_data" => "p_$test")
-        );
+                array(
+                    "text" => "Mi prenoto",
+                    "callback_data" => "p_$test"
+                )
+            );
             $menu[] = array(
-        array(
-        "text" => "Concludi richiesta",
-        "callback_data" => "c_$test")
-        );
+                array(
+                    "text" => "Concludi richiesta",
+                    "callback_data" => "c_$test"
+                )
+            );
             $c = mb_substr($test, 0, 8);
             $k = sm($chatID, "👤 <a href=\"tg://user?id=$userID\">$nome</a>\n🛠 <b>$item</b>\n📦 ".getPC($item)." pc\n💰 $prezzo §\n🏷 #".((is_numeric($c)) ? $c."x" : $c), $menu, 'pred', false);
-            mysqli_query($link, prepare_for_db("UPDATE contrabbandi SET message_id=$k WHERE test=\"".$test."\""));
+            $uq = $GLOBALS['db']->prepare("UPDATE contrabbandi SET message_id=? WHERE test=?");
+            $uq->execute(array($k, $test));
+
             //AGGIUNTA A items
             $item_1 = trim(substr($item, 0, strpos($item, "(")));
             $price_1 = abs((int) filter_var($prezzo, FILTER_SANITIZE_NUMBER_INT));
-            $i_query = mysqli_query($link, prepare_for_db("SELECT * FROM items WHERE name LIKE \"$item_1\""));
-            if (mysqli_num_rows($i_query) == 0) {
+            $i_query = $GLOBALS['db']->prepare("SELECT * FROM items WHERE name LIKE ?");
+            $i_query->execute(array($item_1));
+            if ($i_query->rowCount() == 0) {
                 $items = richiestaAPI("http://fenixweb.net:3300/api/v2/$token/items");
                 $dec = json_decode($items, true);
                 $arr = $dec["res"];
                 if ($arr[0]["id"]) {
                     foreach ($arr as $i) {
-                        $t = mysqli_query($link, prepare_for_db("REPLACE INTO items (id, name, rarity, description, value, estimate, craftable, searchable, reborn, power, power_armor, power_shield, dragon_power, critical, allow_sell) VALUES (".((string) $i['id']).",\"".$i['name']."\",\"".$i['rarity']."\",\"".$i['description']."\",".((string) $i['value']).",".((string) $i['estimate']).",".((string) $i['craftable']).",".((string) $i['reborn']).",".((string) $i['power']).",".((string) $i['power_armor']).",".((string) $i['power_shield']).",".((string) $i['dragon_power']).",".((string) $i['critical']).",".((string) $i['category']).",".((string) $i['allow_sell']).")"));
+                        $t = $GLOBALS['db']->prepare("REPLACE INTO items (id, name, rarity, description, value, estimate, craftable, searchable, reborn, power, power_armor, power_shield, dragon_power, critical, allow_sell) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $t->execute(array(
+                            (string) $i['id'],
+                            $i['name'],
+                            $i['rarity'],
+                            $i['description'],
+                            (string) $i['value'],
+                            (string) $i['estimate'],
+                            (string) $i['craftable'],
+                            (string) $i['reborn'],
+                            (string) $i['power'],
+                            (string) $i['power_armor'],
+                            (string) $i['power_shield'],
+                            (string) $i['dragon_power'],
+                            (string) $i['critical'],
+                            (string) $i['category'],
+                            (string) $i['allow_sell']
+                        ));
                         if ($i['name'] == $item_1) {
-                            mysqli_query($link, prepare_for_db("UPDATE items SET secret_price=$price_1 WHERE id=".((string) $i['id'])));
+                            $ut = $GLOBALS['db']->prepare("UPDATE items SET secret_price=? WHERE id=?");
+                            $ut->execute(array($price_1, (string) $i['id']));
                         }
                     }
                 }
             } else {
-                mysqli_query($link, prepare_for_db("UPDATE items SET secret_price=$price_1 WHERE name LIKE \"$item_1\""));
+                $uq = $GLOBALS['db']->prepare("UPDATE items SET secret_price=? WHERE name LIKE ?");
+                $uq->execute(array($price_1, $item_1));
             }
         } else {
             $m = sm($chatID, "⚠️ $username, questa offerta è già stata inoltrata, usa /repost se vuoi riportarla in primo piano.");
@@ -117,19 +137,24 @@ if (($inoltrato) and ($inoltrato_id==171514820) and (mb_strpos($msg, 'Benvenut')
 
 if (($cbid) and (mb_strpos($msg, "p")===0) and (mb_strpos($cbmtext, "👤 ".$username)!==0)) {
     $test = mb_split("_", $msg)[1];
-    $q = mysqli_query($link, prepare_for_db("SELECT * FROM contrabbandi WHERE test=\"".$test."\""));
-    if (mysqli_num_rows($q)===1) {
-        $array = mysqli_fetch_assoc($q);
-        mysqli_query($link, prepare_for_db("UPDATE contrabbandi SET test=\"*".$array['test']."\" WHERE test=\"".$test."\""));
+    $q = $GLOBALS['db']->prepare("SELECT * FROM contrabbandi WHERE test=?");
+    $q->execute(array($test));
+    if ($q->rowCount() === 1) {
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        $array = $rows[0];
+        $upd = $GLOBALS['db']->prepare("UPDATE contrabbandi SET test=? WHERE test=?");
+        $upd->execute(array($array['test'], $test));
         $menu[] = array(
             array(
-            "text" => "Rinuncio",
-            "callback_data" => "r_$test")
+                "text" => "Rinuncio",
+                "callback_data" => "r_$test"
+            )
         );
         $menu[] = array(
             array(
-            "text" => "Concludi richiesta",
-            "callback_data" => "c_$test")
+                "text" => "Concludi richiesta",
+                "callback_data" => "c_$test"
+            )
         );
         $tag = mb_strpos($cbmtext, "🏷 #");
         $pure_item = trim(substr($array['item'], 0, strpos($array['item'], "(")));
@@ -156,20 +181,33 @@ if (($cbid) and (mb_strpos($msg, "r")===0)) {
         $pc = mb_substr($pezzi[2], 2);
         $prezzo = mb_substr($pezzi[3], 2, (mb_strpos($pezzi[3], " ")>0) ? mb_strpos($pezzi[3], " ") -3 : 0);
         $test = mb_split("_", $msg)[1];
-        $q = mysqli_query($link, prepare_for_db("SELECT * FROM contrabbandi WHERE test=\"".$test."\""));
-        if (mysqli_num_rows($q)===0) {
-            mysqli_query($link, prepare_for_db("INSERT INTO contrabbandi (time, test, nome, item, prezzo, chat_id, creation) VALUES(".((string) time()).", \"".$test."\", \"".$nome."\", \"".$item."\", \"".$prezzo."\", $chatID, ".((string) time()).")"));
-            mysqli_query($link, prepare_for_db("DELETE FROM contrabbandi WHERE test=\"*".$test."\""));
+        $q = $GLOBALS['db']->prepare("SELECT * FROM contrabbandi WHERE test=?");
+        $q->execute(array($test));
+        if ($q->rowCount() === 0) {
+            $iq = $GLOBALS['db']->prepare("INSERT INTO contrabbandi (time, test, nome, item, prezzo, chat_id, creation) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $iq->execute(array(
+                (string) time(),
+                $test,
+                $nome,
+                $item,
+                $prezzo,
+                $chatID,
+                (string) time()
+            ));
+            $dq = $GLOBALS['db']->prepare("DELETE FROM contrabbandi WHERE test=?");
+            $dq->execute(array('*' . $test));
             $menu[] = array(
                 array(
                     "text" => "Mi prenoto",
-                    "callback_data" => "p_$test")
-                );
+                    "callback_data" => "p_$test"
+                )
+            );
             $menu[] = array(
                 array(
                     "text" => "Concludi richiesta",
-                    "callback_data" => "c_$test")
-                );
+                    "callback_data" => "c_$test"
+                )
+            );
             $c = mb_substr($test, 0, 8);
             cb_reply($cbid, 'Hai rinunciato.', false, $cbmid, "🗣 $username\n👤 $nome\n🛠 <b>$item</b>\n📦 $pc\n💰 $prezzo §\n\n🙌");
             $k = sm($chatID, mb_split("\n\n❗️ ", restoreEntities($cbmtext, $entities))[0]."🏷 #".((is_numeric($c)) ? $c."x" : $c), $menu, 'pred', false, $cbmid);
@@ -177,7 +215,12 @@ if (($cbid) and (mb_strpos($msg, "r")===0)) {
                 sm($entities[0]['user']['id'], "@".$username." ha rinunciato alla tua offerta. (Oggetto: ".$item.", Prezzo: ".$prezzo.")");
             }
             sm($userID, "Hai rinunciato all'offerta di $nome. (Oggetto: <b>$item</b>, Prezzo:$prezzo)");
-            mysqli_query($link, prepare_for_db("UPDATE contrabbandi SET time=".((string)time()).", message_id=$k WHERE test=\"".$test."\""));
+            $uq2 = $GLOBALS['db']->prepare("UPDATE contrabbandi SET time=?, message_id=? WHERE test=?");
+            $uq2->execute(array(
+                (string) time(),
+                $k,
+                $test
+            ));
         }
     } else {
         cb_reply($cbid, 'Non sei tu ad essere prenotato!', false);
@@ -187,7 +230,8 @@ if (($cbid) and (mb_strpos($msg, "r")===0)) {
 
 if (($cbid) and (mb_strpos($msg, "c")===0) and ((mb_strpos($cbmtext, "👤 ".$username)===0) or (($status = memberstatus($chatID, $userID))=='administrator' or $status=='creator'))) {
     $test = mb_split("_", $msg)[1];
-    mysqli_query($link, prepare_for_db("DELETE FROM contrabbandi WHERE test=\"".$test."\" OR test=\"*".$test."\""));
+    $dc = $GLOBALS['db']->prepare("DELETE FROM contrabbandi WHERE test=? OR test=?");
+    $dc->execute(array($test, '*'.$test));
     if (mb_strpos($cbmtext, "\n\n❗️ ")!==false) {
         $prenotato = mb_split("\n\n❗️ ", $cbmtext);
         $nick = mb_substr($prenotato[1], 0);
@@ -224,10 +268,14 @@ if (mb_strpos($msg, "/start@ContrabbAndroideBot")===0) {
 }
 
 if ($msg == "/open") {
-    $q = mysqli_query($link, "SELECT COUNT(*) FROM contrabbandi WHERE 1");
-    $n = mysqli_fetch_array($q)[0];
-    $q = mysqli_query($link, prepare_for_db("SELECT COUNT(*) FROM contrabbandi WHERE test LIKE \"*%\""));
-    $m = mysqli_fetch_array($q)[0];
+    $q = $GLOBALS['db']->prepare("SELECT COUNT(*) as count FROM contrabbandi");
+    $q->execute();
+    $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+    $n = $rows[0]['count'];
+    $q = $GLOBALS['db']->prepare("SELECT COUNT(*) as count FROM contrabbandi WHERE test LIKE ?");
+    $q->execute(array("*%"));
+    $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+    $m = $rows[0]['count'];
     sm($chatID, "📈 $n offerte da chiudere/eliminare\n📬 $m rimaste prenotate.");
 }
 
@@ -277,7 +325,6 @@ if (($risposta) and ($risposta_userID==396023029) and (mb_strpos($risposta_msg, 
 if (($msg=="/reset") and (in_array($userID, $admins))) {
     dbreset();
 
-
     sm($chatID, '🚽 Rimosse tutte le offerte nel database.');
     return;
 }
@@ -288,13 +335,16 @@ if (($msg=="/reset") and (in_array($userID, $admins))) {
 
 ////////////////////////////////////////////////////////////
 if (($cbid) or ($inoltrato) or (strpos($msg, "/")===0)) {
-    $p = mysqli_query($link, "SELECT * FROM contrabbandi ORDER BY time LIMIT 3");
-    $n = mysqli_num_rows($p);
-    if ($n>0) {
+    $p = $GLOBALS['db']->prepare("SELECT * FROM contrabbandi ORDER BY time LIMIT 3");
+    $p->execute();
+    $n = $p->rowCount();
+    $rows = $p->fetchAll(PDO::FETCH_ASSOC);
+    if ($n > 0) {
         for ($i=0; ($i<$n) and ($i<3); $i++) {
-            $b = mysqli_fetch_assoc($p);
+            $b = $rows[$i];
             if (((time() - $b['time'])>57600) or ((time() - $b['creation'])>86400)) {
-                mysqli_query($link, prepare_for_db("DELETE FROM contrabbandi WHERE test=\"".$b['test']."\""));
+                $dq = $GLOBALS['db']->prepare("DELETE FROM contrabbandi WHERE test=?");
+                $dq->execute(array($b['test']));
                 $oldchatID = $b['chat_id'];
                 $oldmessID = $b['message_id'];
                 $item = $b['item'];
@@ -303,7 +353,6 @@ if (($cbid) or ($inoltrato) or (strpos($msg, "/")===0)) {
                 if (($oldchatID!=0) and ($oldmessID!=0)) {
                     editm($oldchatID, $oldmessID, "👴🏻 Questa offerta è obsoleta. (Oggetto: <b>$item</b>, Prezzo:$prezzo, Proprietario: $nome)");
                 }
-
                 sleep(5);
             }
         }

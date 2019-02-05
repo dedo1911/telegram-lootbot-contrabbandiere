@@ -9,15 +9,16 @@ $update = json_decode($content, true);
 var_dump($content);
 
 
-require '_config.php';
+require 'config.php';
+require 'database.php';
 
-$api = $config['api'];
-$idadmin = $config['admin'];
+$api = $GLOBALS['config']['api'];
+$idadmin = $GLOBALS['config']['admin'];
 $adminID = $idadmin;
-$userbot = $config['userbot'];
+$userbot = $GLOBALS['config']['userbot'];
 
 require 'functions.php';
-require '_comandi.php';
+require 'comandi.php';
 
 $file = "input.json";
 $f2 = fopen($file, 'w');
