@@ -1,23 +1,22 @@
 <?php
 
-require 'class-http-request.php';
-
-
-$content = file_get_contents("php://input");
-$update = json_decode($content, true);
-
 require 'config.php';
 require 'database.php';
 
-$api = $GLOBALS['config']['api'];
-$idadmin = $GLOBALS['config']['admin'];
-$adminID = $idadmin;
-$userbot = $GLOBALS['config']['userbot'];
+require 'Telegram.php';
+$GLOBALS['telegram'] = new Telegram($GLOBALS['config']['tg_token']);
+
+// Store data from php://input for future uses
+$GLOBALS['telegram']->setData($GLOBALS['telegram']->getData());
+
+file_put_contents('input_debug.json', json_encode($GLOBALS['telegram']->getData(), JSON_PRETTY_PRINT));
 
 require 'functions.php';
-require 'comandi.php';
+require 'messages.php';
+require 'menus.php';
+require 'commands.php';
+require 'actions.php';
 
-$file = "input.json";
-$f2 = fopen($file, 'w');
-fwrite($f2, $content);
-fclose($f2);
+// TODO: Invoke stuff
+
+require 'cleanup.php';

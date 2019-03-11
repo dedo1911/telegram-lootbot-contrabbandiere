@@ -1,5 +1,8 @@
 <?php
 
+global $update;
+global $userbot;
+
 if ($GLOBALS['config']['funziona_nei_canali']) {
     if ($update["channel_post"]) {
         $update["message"] = $update["channel_post"];
@@ -116,25 +119,22 @@ function sm($chatID, $text, $rmf = false, $pm = 'pred', $dis = false, $replyto =
 
     if (!$inline) {
         if ($rmf == 'nascondi') {
-            $rm = array('hide_keyboard' => true
-);
+            $rm = array('hide_keyboard' => true);
         } else {
             $rm = array('keyboard' => $rmf,
-'resize_keyboard' => true
-);
+                'resize_keyboard' => true);
         }
     } else {
-        $rm = array('inline_keyboard' => $rmf,
-);
+        $rm = array('inline_keyboard' => $rmf);
     }
     $rm = json_encode($rm);
 
     $args = array(
-'chat_id' => $chatID,
-'text' => $text,
-'disable_notification' => $dis,
-'parse_mode' => $pm
-);
+        'chat_id' => $chatID,
+        'text' => $text,
+        'disable_notification' => $dis,
+        'parse_mode' => $pm
+    );
     if ($dal) {
         $args['disable_web_page_preview'] = $dal;
     }
@@ -177,10 +177,10 @@ function smReturn($chatID, $text, $replyto = false, $dal = false)
     //$dal = $config["nascondi_anteprima_link"];
  
     $args = array(
-'chat_id' => $chatID,
-'text' => $text,
-'parse_mode' => $pm
-);
+        'chat_id' => $chatID,
+        'text' => $text,
+        'parse_mode' => $pm
+    );
     if ($dal) {
         $args['disable_web_page_preview'] = $dal;
     }
@@ -217,27 +217,25 @@ function cb_reply($id, $text, $alert = false, $cbmid = false, $ntext = false, $n
 
 
     $args = array(
-'callback_query_id' => $id,
-'text' => $text,
-'show_alert' => $alert
-
-);
+        'callback_query_id' => $id,
+        'text' => $text,
+        'show_alert' => $alert
+    );
     $r = new HttpRequest("get", "https://api.telegram.org/$api/answerCallbackQuery", $args);
 
     if ($cbmid) {
         if ($nmenu) {
-            $rm = array('inline_keyboard' => $nmenu
-);
+            $rm = array('inline_keyboard' => $nmenu);
             $rm = json_encode($rm);
         }
 
         if ($ntext) {
             $args = array(
-'chat_id' => $chatID,
-'message_id' => $cbmid,
-'text' => $ntext,
-'parse_mode' => $npm,
-);
+                'chat_id' => $chatID,
+                'message_id' => $cbmid,
+                'text' => $ntext,
+                'parse_mode' => $npm,
+            );
             if ($nmenu) {
                 $args["reply_markup"] = $rm;
             }
@@ -245,29 +243,6 @@ function cb_reply($id, $text, $alert = false, $cbmid = false, $ntext = false, $n
         }
     }
 }
-
-
-function leave()
-{
-    global $api;
-    global $chatID;
-    $args = array(
-'chat_id' => $chatID
-);
-    $r = new HttpRequest("post", "https://api.telegram.org/$api/leaveChat", $args);
-    $rr = $r->getResponse();
-    $ar = json_decode($rr, true);
-    $ok = $ar["ok"]; //false
-    $e403 = $ar["error_code"];
-    if ($e403 == "403") {
-        return false;
-    } elseif ($e403) {
-        return false;
-    } else {
-        return true;
-    }
-}
-
 
 
 
@@ -291,11 +266,6 @@ function memberstatus($chatID, $memberID)
 }
 
 
-
-function remove_emoji($text)
-{
-    return preg_replace('/[[:^print:]]/', ' ', $text);
-}
 function restoreEntities($text, $entities = [])
 {
     if (is_string($text)) {
@@ -357,17 +327,12 @@ function editm($chatID, $messID, $testo, $pm = 'pred')
 }
 
 
-function delm($chatID, $messID)
-{
-    global $api;
-    global $userID;
-    $args = array(
-'chat_id' => $chatID,
-'message_id' => $messID,
-);
-    $r = new HttpRequest("post", "https://api.telegram.org/$api/deleteMessage", $args);
-    $rr = $r->getResponse();
-    return $rr['ok'];
+function delm($chatID, $messID) {
+    $r = $GLOBALS['telegram']->deleteMessage(array(
+        'chat_id' => $chatID,
+        'message_id' => $messID,
+    ));
+    return $r['ok'];
 }
 
 $modificatore = "OFFERTA LIBERA. Max: ";
@@ -739,22 +704,4 @@ function getPC($item)
         }
     }
     return "n/a (not found)";
-}
-
-function tableFormat($item)
-{
-    $i_tem = preg_replace("/ /", "_", $item);
-    $i_tem = preg_replace("/[^\w]/", "", $i_tem);
-    return $i_tem;
-}
-
-function is_between_times($start = null, $end = null)
-{
-    if ($start == null) {
-        $start = '00:00';
-    }
-    if ($end == null) {
-        $end = '23:59';
-    }
-    return ($start <= date('H:i') && date('H:i') <= $end);
 }
